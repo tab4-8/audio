@@ -302,6 +302,11 @@ ifeq ($(strip $(AUDIO_FEATURE_ENABLED_PM_SUPPORT)),true)
     LOCAL_SHARED_LIBRARIES += libperipheral_client
 endif
 
+#for factory test to select left speaker and right speaker
+ifneq ($(filter Lenovo,$(LCT_CUSTOM_NAME)),)
+    LOCAL_CFLAGS += -DAUDIO_SELECT_SPEAKER
+endif
+
 LOCAL_CFLAGS += -Wall -Werror
 
 LOCAL_COPY_HEADERS_TO   := mm-audio

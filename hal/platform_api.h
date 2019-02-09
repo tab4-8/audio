@@ -81,6 +81,9 @@ int platform_edid_get_max_channels(void *platform);
 void platform_get_parameters(void *platform, struct str_parms *query,
                              struct str_parms *reply);
 int platform_set_parameters(void *platform, struct str_parms *parms);
+#ifdef AUDIO_SELECT_SPEAKER
+void platform_select_spk(void *platform, char *value);
+#endif
 int platform_set_incall_recording_session_id(void *platform, uint32_t session_id,
                                              int rec_mode);
 int platform_stop_incall_recording_usecase(void *platform);

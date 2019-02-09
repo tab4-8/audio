@@ -86,6 +86,10 @@
 #define PROXY_OPEN_RETRY_COUNT           100
 #define PROXY_OPEN_WAIT_TIME             20
 
+#ifdef AUDIO_SELECT_SPEAKER
+#define AUDIO_PARAMETER_KEY_SELECT_SPK  "select_spk"
+#endif
+
 #ifdef USE_LL_AS_PRIMARY_OUTPUT
 #define USECASE_AUDIO_PLAYBACK_PRIMARY USECASE_AUDIO_PLAYBACK_LOW_LATENCY
 #define PCM_CONFIG_AUDIO_PLAYBACK_PRIMARY pcm_config_low_latency
@@ -3939,6 +3943,23 @@ static int adev_set_parameters(struct audio_hw_device *dev, const char *kvpairs)
     status = platform_set_parameters(adev->platform, parms);
     if (status != 0)
         goto done;
+
+    #ifdef AUDIO_SELECT_SPEAKER
+        ret = str_parms_get_str(parms, AUDIO_PARAMETER_KEY_SELECT_SPK, value, sizeof(value));
+        if (ret >= 0) {
+            str_parms_del(parms, AUDIO_PARAMETER_KEY_SELECT_SPK);
+            platform_select_spk(adev->platform, value);
+            struct audio_usecase *usecase;
+            struct listnode *node;
+            list_for_each(node, &adev->usecase_list) {
+                usecase = node_to_item(node, struct audio_usecase, list);
+                if (usecase->type == PCM_PLAYBACK) {
+                    select_devices(adev, usecase->id);
+                    break;
+                }
+            }
+        }
+    #endif
 
     ret = str_parms_get_str(parms, AUDIO_PARAMETER_KEY_BT_NREC, value, sizeof(value));
     if (ret >= 0) {

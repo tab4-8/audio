@@ -1682,7 +1682,10 @@ audio_io_handle_t AudioPolicyManagerCustom::getOutputForDevice(
     if ((flags == AUDIO_OUTPUT_FLAG_NONE) &&
         (stream == AUDIO_STREAM_MUSIC) &&
         (offloadInfo != NULL) && !is_track_offload_active &&
-        ((offloadInfo->usage == AUDIO_USAGE_MEDIA) || (offloadInfo->usage == AUDIO_USAGE_GAME))) {
+        //slt yangxinzhao modified for Dolby not work play music which provided from Qualcomm
+        //((offloadInfo->usage == AUDIO_USAGE_MEDIA) || (offloadInfo->usage == AUDIO_USAGE_GAME))) {
+        (offloadInfo->usage == AUDIO_USAGE_GAME)) {
+        //end of modify from Qualcomm
         flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_DIRECT_PCM);
         ALOGD("AudioCustomHAL --> Force Direct Flag .. flag (0x%x)", flags);
     }

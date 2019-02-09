@@ -123,6 +123,10 @@ enum {
     SND_DEVICE_OUT_VOIP_SPEAKER,
     SND_DEVICE_OUT_VOIP_HEADPHONES,
 #endif
+#ifdef AUDIO_SELECT_SPEAKER
+    SND_DEVICE_OUT_SPEAKER_ONLY_LEFT,
+    SND_DEVICE_OUT_SPEAKER_ONLY_RIGHT,
+#endif
     SND_DEVICE_OUT_END,
 
     /*
@@ -228,7 +232,7 @@ enum {
 #define SND_CARD_MAX_LENGTH 100
 #define CODEC_VERSION_MAX_LENGTH 100
 
-#define MAX_VOL_INDEX 5
+#define MAX_VOL_INDEX 6
 #define MIN_VOL_INDEX 0
 #define percent_to_index(val, min, max) \
             ((val) * ((max) - (min)) * 0.01 + (min) + .5)

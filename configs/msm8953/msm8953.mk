@@ -142,7 +142,7 @@ audio.offload.pcm.24bit.enable=true
 
 #Enable audio track offload by default
 PRODUCT_PROPERTY_OVERRIDES += \
-audio.offload.track.enable=true
+audio.offload.track.enable=false
 
 #Enable music through deep buffer
 PRODUCT_PROPERTY_OVERRIDES += \

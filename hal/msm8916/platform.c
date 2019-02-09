@@ -155,6 +155,14 @@ enum {
 	VOICE_FEATURE_SET_VOLUME_BOOST
 };
 
+#ifdef AUDIO_SELECT_SPEAKER
+enum {
+	FACTORY_SELECT_SPK_NONE,
+	FACTORY_SELECT_SPK_LEFT,
+	FACTORY_SELECT_SPK_RIGHT
+};
+#endif
+
 struct audio_block_header
 {
     int reserved;
@@ -239,6 +247,10 @@ struct platform_data {
 #ifdef RECORD_PLAY_CONCURRENCY
     bool rec_play_conc_set;
 #endif
+#ifdef AUDIO_SELECT_SPEAKER
+    int select_spk;
+#endif
+
     void *hw_info;
     struct csd_data *csd;
     void *edid_info;
@@ -326,6 +338,10 @@ static const char * const device_table[SND_DEVICE_MAX] = {
     /* Playback sound devices */
     [SND_DEVICE_OUT_HANDSET] = "handset",
     [SND_DEVICE_OUT_SPEAKER] = "speaker",
+#ifdef AUDIO_SELECT_SPEAKER
+    [SND_DEVICE_OUT_SPEAKER_ONLY_LEFT] = "speaker-only-left",
+    [SND_DEVICE_OUT_SPEAKER_ONLY_RIGHT] = "speaker-only-right",
+#endif
     [SND_DEVICE_OUT_SPEAKER_EXTERNAL_1] = "speaker-ext-1",
     [SND_DEVICE_OUT_SPEAKER_EXTERNAL_2] = "speaker-ext-2",
     [SND_DEVICE_OUT_SPEAKER_WSA] = "wsa-speaker",
@@ -446,12 +462,16 @@ static int backend_bit_width_table[SND_DEVICE_MAX] = {0};
 static int acdb_device_table[SND_DEVICE_MAX] = {
     [SND_DEVICE_NONE] = -1,
     [SND_DEVICE_OUT_HANDSET] = 7,
-    [SND_DEVICE_OUT_SPEAKER] = 14,
-    [SND_DEVICE_OUT_SPEAKER_EXTERNAL_1] = 14,
-    [SND_DEVICE_OUT_SPEAKER_EXTERNAL_2] = 14,
+    [SND_DEVICE_OUT_SPEAKER] = 15,
+    [SND_DEVICE_OUT_SPEAKER_EXTERNAL_1] = 15,
+    [SND_DEVICE_OUT_SPEAKER_EXTERNAL_2] = 15,
     [SND_DEVICE_OUT_SPEAKER_WSA] = 135,
     [SND_DEVICE_OUT_SPEAKER_VBAT] = 135,
-    [SND_DEVICE_OUT_SPEAKER_REVERSE] = 14,
+    [SND_DEVICE_OUT_SPEAKER_REVERSE] = 15,
+#ifdef AUDIO_SELECT_SPEAKER
+    [SND_DEVICE_OUT_SPEAKER_ONLY_LEFT] = 15,
+    [SND_DEVICE_OUT_SPEAKER_ONLY_RIGHT] = 15,
+#endif
     [SND_DEVICE_OUT_LINE] = 10,
     [SND_DEVICE_OUT_HEADPHONES] = 10,
     [SND_DEVICE_OUT_HEADPHONES_44_1] = 10,
@@ -461,23 +481,23 @@ static int acdb_device_table[SND_DEVICE_MAX] = {
     [SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES_EXTERNAL_2] = 10,
     [SND_DEVICE_OUT_VOICE_HANDSET] = 7,
     [SND_DEVICE_OUT_VOICE_LINE] = 10,
-    [SND_DEVICE_OUT_VOICE_SPEAKER] = 14,
+    [SND_DEVICE_OUT_VOICE_SPEAKER] = 15,
     [SND_DEVICE_OUT_VOICE_SPEAKER_WSA] = 135,
     [SND_DEVICE_OUT_VOICE_SPEAKER_VBAT] = 135,
     [SND_DEVICE_OUT_VOICE_HEADPHONES] = 10,
     [SND_DEVICE_OUT_HDMI] = 18,
-    [SND_DEVICE_OUT_SPEAKER_AND_HDMI] = 14,
+    [SND_DEVICE_OUT_SPEAKER_AND_HDMI] = 15,
     [SND_DEVICE_OUT_BT_SCO] = 22,
     [SND_DEVICE_OUT_BT_SCO_WB] = 39,
     [SND_DEVICE_OUT_BT_A2DP] = 20,
-    [SND_DEVICE_OUT_SPEAKER_AND_BT_A2DP] = 14,
+    [SND_DEVICE_OUT_SPEAKER_AND_BT_A2DP] = 15,
     [SND_DEVICE_OUT_VOICE_TTY_FULL_HEADPHONES] = 17,
     [SND_DEVICE_OUT_VOICE_TTY_VCO_HEADPHONES] = 17,
     [SND_DEVICE_OUT_VOICE_TTY_HCO_HANDSET] = 37,
     [SND_DEVICE_OUT_VOICE_TX] = 45,
     [SND_DEVICE_OUT_AFE_PROXY] = 0,
     [SND_DEVICE_OUT_USB_HEADSET] = 45,
-    [SND_DEVICE_OUT_SPEAKER_AND_USB_HEADSET] = 14,
+    [SND_DEVICE_OUT_SPEAKER_AND_USB_HEADSET] = 15,
     [SND_DEVICE_OUT_TRANSMISSION_FM] = 0,
     [SND_DEVICE_OUT_ANC_HEADSET] = 26,
     [SND_DEVICE_OUT_ANC_FB_HEADSET] = 27,
@@ -1674,6 +1694,9 @@ void *platform_init(struct audio_device *adev)
     my_data->edid_info = NULL;
     my_data->is_wsa_speaker = false;
     my_data->hw_dep_fd = -1;
+#ifdef AUDIO_SELECT_SPEAKER
+    my_data->select_spk = FACTORY_SELECT_SPK_NONE;
+#endif
 
     property_get("ro.qc.sdk.audio.fluencetype", my_data->fluence_cap, "");
     if (!strncmp("fluencepro", my_data->fluence_cap, sizeof("fluencepro"))) {
@@ -2844,6 +2867,8 @@ snd_device_t platform_get_output_snd_device(void *platform, struct stream_out *o
     struct audio_device *adev = my_data->adev;
     audio_mode_t mode = adev->mode;
     snd_device_t snd_device = SND_DEVICE_NONE;
+    bool prop_bootanim_exit = true;
+    char bootanimPropValue[PROPERTY_VALUE_MAX];
     audio_devices_t devices = out->devices;
     unsigned int sample_rate = out->sample_rate;
     int na_mode = platform_get_native_support();
@@ -2860,6 +2885,10 @@ snd_device_t platform_get_output_snd_device(void *platform, struct stream_out *o
     ALOGV("platform_get_output_snd_device use_voip_out_devices : %d",use_voip_out_devices);
 #endif
 
+    if (property_get("service.bootanim.exit", bootanimPropValue, NULL)) {
+        prop_bootanim_exit = atoi(bootanimPropValue) || !strncmp("true", bootanimPropValue, 4);
+    }
+
     audio_channel_mask_t channel_mask = (adev->active_input == NULL) ?
                                 AUDIO_CHANNEL_IN_MONO : adev->active_input->channel_mask;
     int channel_count = popcount(channel_mask);
@@ -2868,6 +2897,12 @@ snd_device_t platform_get_output_snd_device(void *platform, struct stream_out *o
     if (devices == AUDIO_DEVICE_NONE ||
         devices & AUDIO_DEVICE_BIT_IN) {
         ALOGV("%s: Invalid output devices (%#x)", __func__, devices);
+        goto exit;
+    }
+
+    if (!prop_bootanim_exit) {
+        snd_device = SND_DEVICE_OUT_SPEAKER_AND_HEADPHONES;
+        ALOGI("%s: bootanimation not exit (%#x)", __func__, devices);
         goto exit;
     }
 
@@ -3029,6 +3064,14 @@ snd_device_t platform_get_output_snd_device(void *platform, struct stream_out *o
                     snd_device = SND_DEVICE_OUT_SPEAKER_VBAT;
                 else if (my_data->is_wsa_speaker)
                     snd_device = SND_DEVICE_OUT_SPEAKER_WSA;
+                #ifdef AUDIO_SELECT_SPEAKER
+                else if (my_data->select_spk == FACTORY_SELECT_SPK_NONE)
+                     snd_device = SND_DEVICE_OUT_SPEAKER;
+                else if (my_data->select_spk == FACTORY_SELECT_SPK_LEFT)
+                     snd_device = SND_DEVICE_OUT_SPEAKER_ONLY_LEFT;
+                else if (my_data->select_spk == FACTORY_SELECT_SPK_RIGHT)
+                     snd_device = SND_DEVICE_OUT_SPEAKER_ONLY_RIGHT;
+                #endif
                 else
                     snd_device = SND_DEVICE_OUT_SPEAKER;
             }
@@ -3674,6 +3717,19 @@ int platform_set_parameters(void *platform, struct str_parms *parms)
     ALOGV("%s: exit with code(%d)", __func__, ret);
     return ret;
 }
+
+#ifdef AUDIO_SELECT_SPEAKER
+void platform_select_spk(void *platform, char *value)
+{
+     struct platform_data *my_data = (struct platform_data *)platform;
+     if (!strcmp(value, "left"))
+        my_data->select_spk = FACTORY_SELECT_SPK_LEFT;
+     else if (!strcmp(value, "right"))
+        my_data->select_spk = FACTORY_SELECT_SPK_RIGHT;
+     else
+        my_data->select_spk = FACTORY_SELECT_SPK_NONE;
+}
+#endif
 
 int platform_set_incall_recording_session_id(void *platform,
                                              uint32_t session_id, int rec_mode)
